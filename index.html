@@ -184,14 +184,4 @@
 
     document.getElementById('locate-btn').addEventListener('click', () => {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          L.marker([lat, lon]).addTo(map)
-            .bindPopup('📍 Estás aquí').openPopup();
-          map.setView([lat, lon], 15);
-        }, () => {
-          alert('No se pudo obtener tu ubicación.');
-        });
-      } else {
-        alert('Ge
+        navigator.geolocation.getCurrentPosition
