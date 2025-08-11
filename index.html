@@ -1,28 +1,197 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Privacy Policy & Terms of Service</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa — Casas de Cambio y Cripto Cartagena</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <style>
-    body { font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto; }
-    h1, h2 { color: #333; }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    #exchange-rate {
+      padding: 10px;
+      font-family: sans-serif;
+      background: #f4f4f4;
+      border-bottom: 1px solid #ccc;
+    }
+    .custom-div-icon div {
+      background: #fff;
+      border-radius: 12px;
+      padding: 6px 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      font-size: 14px;
+      font-weight: bold;
+    }
+    #filters {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      font-family: sans-serif;
+    }
+    #locate-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: #0078d7;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      font-family: sans-serif;
+      cursor: pointer;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
-  <h1>Privacy Policy</h1>
-  <p>This application uses TikTok's official API to authenticate users and perform automated actions. We do not store, sell, or share your personal data or TikTok credentials.</p>
-  <p>All data is processed securely and used only for the intended automation features within n8n. No third-party analytics or tracking tools are used.</p>
+  <div id="exchange-rate">
+    <strong>💱 Tipo de cambio actual:</strong><br>
+    <span id="eurusd">EUR/USD: Cargando...</span><br>
+    <span id="eurgbp">EUR/GBP: Cargando...</span><br>
+    <span id="eurmxn">EUR/MXN: Cargando...</span><br>
+    <span id="eurjpy">EUR/JPY: Cargando...</span><br>
+    <span id="eurcop">EUR/COP: Cargando...</span><br>
+    <span id="eurars">EUR/ARS: Cargando...</span><br>
+    <span id="btceur">BTC/EUR: Cargando...</span><br>
+    <span id="etheur">ETH/EUR: Cargando...</span><br>
+    <span id="usdteur">USDT/EUR: Cargando...</span>
+  </div>
 
-  <h2>Terms of Service</h2>
-  <ul>
-    <li>You authorize the app to interact with your TikTok account via official APIs.</li>
-    <li>You will not use the app for spam, abuse, or unauthorized automation.</li>
-    <li>You understand that this app is provided “as is” without warranties.</li>
-    <li>You are responsible for complying with TikTok’s terms and policies.</li>
-    <li>We are not liable for any actions taken by TikTok against your account.</li>
-  </ul>
+  <button id="locate-btn">📍 Mi ubicación</button>
+  <div id="filters">
+    <label><input type="checkbox" id="fiatFilter" checked> Casas de cambio 💶</label><br>
+    <label><input type="checkbox" id="cryptoFilter" checked> Cajeros cripto ₿</label>
+  </div>
 
-  <h2>Contact</h2>
-  <p>For questions or concerns, contact us at: pedro@example.com</p>
-</body>
-</html>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script>
+    const map = L.map('map').setView([37.6058, -0.9875], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.Control.geocoder({
+      defaultMarkGeocode: false
+    })
+    .on('markgeocode', function(e) {
+      const bbox = e.geocode.bbox;
+      const poly = L.polygon([
+        bbox.getSouthEast(),
+        bbox.getNorthEast(),
+        bbox.getNorthWest(),
+        bbox.getSouthWest()
+      ]).addTo(map);
+      map.fitBounds(poly.getBounds());
+    })
+    .addTo(map);
+
+    const markersData = [
+      {
+        name: 'Quickgold Cartagena - Compro Oro',
+        lat: 37.6058,
+        lon: -0.9875,
+        type: 'fiat',
+        url: 'https://quickgold.es/vender-oro/compro-oro-cartagena'
+      },
+      {
+        name: 'Eurochange',
+        lat: 37.6039,
+        lon: -0.9870,
+        type: 'fiat',
+        url: 'https://eurochange.es/'
+      },
+      {
+        name: 'Cajero Bitcoin | BitBase ATM',
+        lat: 37.5850,
+        lon: -0.9920,
+        type: 'crypto',
+        url: 'https://www.bitbase.es/'
+      }
+    ];
+
+    const markers = [];
+
+    function makeIcon(label) {
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div>${label}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      });
+    }
+
+    function renderMarkers() {
+      markers.forEach(m => map.removeLayer(m));
+      markers.length = 0;
+
+      const showFiat = document.getElementById('fiatFilter').checked;
+      const showCrypto = document.getElementById('cryptoFilter').checked;
+
+      markersData.forEach(data => {
+        if ((data.type === 'fiat' && showFiat) || (data.type === 'crypto' && showCrypto)) {
+          const label = data.type === 'fiat' ? '💶' : '₿';
+          const marker = L.marker([data.lat, data.lon], { icon: makeIcon(label) })
+            .addTo(map)
+            .bindPopup(`<strong>${data.name}</strong><br><a href="${data.url}" target="_blank">Ver sitio web</a>`);
+          markers.push(marker);
+        }
+      });
+    }
+
+    document.getElementById('fiatFilter').addEventListener('change', renderMarkers);
+    document.getElementById('cryptoFilter').addEventListener('change', renderMarkers);
+    renderMarkers();
+
+    function updateRates() {
+      fetch('https://cdn.dinero.today/api/latest.json')
+        .then(res => res.json())
+        .then(data => {
+          const r = data.rates;
+          document.getElementById('eurusd').textContent = `EUR/USD: ${(r.USD / r.EUR).toFixed(4)}`;
+          document.getElementById('eurgbp').textContent = `EUR/GBP: ${(r.GBP / r.EUR).toFixed(4)}`;
+          document.getElementById('eurmxn').textContent = `EUR/MXN: ${(r.MXN / r.EUR).toFixed(2)}`;
+          document.getElementById('eurjpy').textContent = `EUR/JPY: ${(r.JPY / r.EUR).toFixed(2)}`;
+          document.getElementById('eurcop').textContent = `EUR/COP: ${(r.COP / r.EUR).toFixed(0)}`;
+          document.getElementById('eurars').textContent = `EUR/ARS: ${(r.ARS / r.EUR).toFixed(2)}`;
+        })
+        .catch(err => {
+          console.error('Error al cargar dinero.today:', err);
+        });
+
+      fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether&vs_currencies=eur')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('btceur').textContent = `BTC/EUR: ${data.bitcoin.eur.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`;
+          document.getElementById('etheur').textContent = `ETH/EUR: ${data.ethereum.eur.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`;
+          document.getElementById('usdteur').textContent = `USDT/EUR: ${data.tether.eur.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`;
+        })
+        .catch(err => {
+          console.error('Error al cargar CoinGecko:', err);
+        });
+    }
+
+    updateRates();
+    setInterval(updateRates, 60000);
+
+    document.getElementById('locate-btn').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          L.marker([lat, lon]).addTo(map)
+            .bindPopup('📍 Estás aquí').openPopup();
+          map.setView([lat, lon], 15);
+        }, () => {
+          alert('No se pudo obtener tu ubicación.');
+        });
+      } else {
+        alert('Ge
